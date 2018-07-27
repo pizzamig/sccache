@@ -13,10 +13,10 @@ matrix:
     - rust: nightly
 
     # deployments
-    - env: DEPLOY=1 TARGET=x86_64-apple-darwin
+    - env: DEPLOY=0 TARGET=x86_64-apple-darwin
       script: cargo build --release --target $TARGET --features=all
       os: osx
-    - env: DEPLOY=1 TARGET=x86_64-unknown-linux-musl OPENSSL_DIR=$HOME/openssl-musl
+    - env: DEPLOY=0 TARGET=x86_64-unknown-linux-musl OPENSSL_DIR=$HOME/openssl-musl
       before_script: ./scripts/travis-musl-openssl.sh
       script: cargo build --release --target $TARGET --features=all
       addons:

@@ -15,8 +15,8 @@
 use directories::ProjectDirs;
 use regex::Regex;
 use std::env;
-use std::io::Read;
 use std::fs::File;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use toml;
@@ -31,7 +31,9 @@ const TEN_GIGS: u64 = 10 * 1024 * 1024 * 1024;
 
 pub fn default_disk_cache_dir() -> PathBuf {
     ProjectDirs::from("", ORGANIZATION, APP_NAME)
-        .cache_dir().to_owned()
+        .unwrap()
+        .cache_dir()
+        .to_owned()
 }
 
 fn parse_size(val: &str) -> Option<u64> {
@@ -42,23 +44,19 @@ fn parse_size(val: &str) -> Option<u64> {
                 .and_then(|size| u64::from_str(size.as_str()).ok())
                 .and_then(|size| Some((size, caps.get(2))))
         })
-        .and_then(|(size, suffix)| {
-            match suffix.map(|s| s.as_str()) {
-                Some("K") => Some(1024 * size),
-                Some("M") => Some(1024 * 1024 * size),
-                Some("G") => Some(1024 * 1024 * 1024 * size),
-                Some("T") => Some(1024 * 1024 * 1024 * 1024 * size),
-                _ => None,
-            }
+        .and_then(|(size, suffix)| match suffix.map(|s| s.as_str()) {
+            Some("K") => Some(1024 * size),
+            Some("M") => Some(1024 * 1024 * size),
+            Some("G") => Some(1024 * 1024 * 1024 * size),
+            Some("T") => Some(1024 * 1024 * 1024 * 1024 * size),
+            _ => None,
         })
 }
 
-#[derive(Debug, PartialEq, Eq)]
-#[derive(Deserialize)]
+#[derive(Debug, PartialEq, Eq, Deserialize)]
 pub struct AzureCacheConfig;
 
-#[derive(Debug, PartialEq, Eq)]
-#[derive(Deserialize)]
+#[derive(Debug, PartialEq, Eq, Deserialize)]
 pub struct DiskCacheConfig {
     pub dir: PathBuf,
     // TODO: use deserialize_with to allow human-readable sizes in toml
@@ -74,8 +72,7 @@ impl Default for DiskCacheConfig {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[derive(Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize)]
 pub enum GCSCacheRWMode {
     #[serde(rename = "READ_ONLY")]
     ReadOnly,
@@ -83,28 +80,24 @@ pub enum GCSCacheRWMode {
     ReadWrite,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-#[derive(Deserialize)]
+#[derive(Debug, PartialEq, Eq, Deserialize)]
 pub struct GCSCacheConfig {
     pub bucket: String,
     pub cred_path: Option<PathBuf>,
     pub rw_mode: GCSCacheRWMode,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-#[derive(Deserialize)]
+#[derive(Debug, PartialEq, Eq, Deserialize)]
 pub struct MemcachedCacheConfig {
     pub url: String,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-#[derive(Deserialize)]
+#[derive(Debug, PartialEq, Eq, Deserialize)]
 pub struct RedisCacheConfig {
     pub url: String,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-#[derive(Deserialize)]
+#[derive(Debug, PartialEq, Eq, Deserialize)]
 pub struct S3CacheConfig {
     pub bucket: String,
     pub endpoint: String,
@@ -119,8 +112,7 @@ pub enum CacheType {
     S3(S3CacheConfig),
 }
 
-#[derive(Debug, Default)]
-#[derive(Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub struct CacheConfigs {
     azure: Option<AzureCacheConfig>,
     disk: Option<DiskCacheConfig>,
@@ -135,10 +127,16 @@ impl CacheConfigs {
     /// consistent ordering
     fn into_vec_and_fallback(self) -> (Vec<CacheType>, DiskCacheConfig) {
         let CacheConfigs {
-            azure, disk, gcs, memcached, redis, s3
+            azure,
+            disk,
+            gcs,
+            memcached,
+            redis,
+            s3,
         } = self;
 
-        let caches = s3.map(CacheType::S3).into_iter()
+        let caches = s3.map(CacheType::S3)
+            .into_iter()
             .chain(redis.map(CacheType::Redis))
             .chain(memcached.map(CacheType::Memcached))
             .chain(gcs.map(CacheType::GCS))
@@ -152,20 +150,36 @@ impl CacheConfigs {
     /// Override self with any existing fields from other
     fn merge(&mut self, other: Self) {
         let CacheConfigs {
-            azure, disk, gcs, memcached, redis, s3
+            azure,
+            disk,
+            gcs,
+            memcached,
+            redis,
+            s3,
         } = other;
 
-        if azure.is_some()     { self.azure = azure }
-        if disk.is_some()      { self.disk = disk }
-        if gcs.is_some()       { self.gcs = gcs }
-        if memcached.is_some() { self.memcached = memcached }
-        if redis.is_some()     { self.redis = redis }
-        if s3.is_some()        { self.s3 = s3 }
+        if azure.is_some() {
+            self.azure = azure
+        }
+        if disk.is_some() {
+            self.disk = disk
+        }
+        if gcs.is_some() {
+            self.gcs = gcs
+        }
+        if memcached.is_some() {
+            self.memcached = memcached
+        }
+        if redis.is_some() {
+            self.redis = redis
+        }
+        if s3.is_some() {
+            self.s3 = s3
+        }
     }
 }
 
-#[derive(Debug, Default)]
-#[derive(Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub struct FileConfig {
     cache: CacheConfigs,
 }
@@ -197,49 +211,52 @@ pub struct EnvConfig {
 }
 
 fn config_from_env() -> EnvConfig {
-    let s3 = env::var("SCCACHE_BUCKET").ok()
-        .map(|bucket| {
-            let endpoint = match env::var("SCCACHE_ENDPOINT") {
-                Ok(endpoint) => format!("{}/{}", endpoint, bucket),
-                _ => match env::var("SCCACHE_REGION") {
-                    Ok(ref region) if region != "us-east-1" =>
-                        format!("{}.s3-{}.amazonaws.com", bucket, region),
-                    _ => format!("{}.s3.amazonaws.com", bucket),
-                },
-            };
-            S3CacheConfig { bucket, endpoint }
-        });
+    let s3 = env::var("SCCACHE_BUCKET").ok().map(|bucket| {
+        let endpoint = match env::var("SCCACHE_ENDPOINT") {
+            Ok(endpoint) => format!("{}/{}", endpoint, bucket),
+            _ => match env::var("SCCACHE_REGION") {
+                Ok(ref region) if region != "us-east-1" => {
+                    format!("{}.s3-{}.amazonaws.com", bucket, region)
+                }
+                _ => format!("{}.s3.amazonaws.com", bucket),
+            },
+        };
+        S3CacheConfig { bucket, endpoint }
+    });
 
-    let redis = env::var("SCCACHE_REDIS").ok()
+    let redis = env::var("SCCACHE_REDIS")
+        .ok()
         .map(|url| RedisCacheConfig { url });
 
-    let memcached = env::var("SCCACHE_MEMCACHED").ok()
+    let memcached = env::var("SCCACHE_MEMCACHED")
+        .ok()
         .map(|url| MemcachedCacheConfig { url });
 
-    let gcs = env::var("SCCACHE_GCS_BUCKET").ok()
-        .map(|bucket| {
-            let cred_path = env::var_os("SCCACHE_GCS_KEY_PATH")
-                .map(|p| PathBuf::from(p));
-            let rw_mode = match env::var("SCCACHE_GCS_RW_MODE")
-                                      .as_ref().map(String::as_str) {
-                Ok("READ_ONLY") => GCSCacheRWMode::ReadOnly,
-                Ok("READ_WRITE") => GCSCacheRWMode::ReadWrite,
-                // TODO: unsure if these should warn during the configuration loading
-                // or at the time when they're actually used to connect to GCS
-                Ok(_) => {
-                    warn!("Invalid SCCACHE_GCS_RW_MODE-- defaulting to READ_ONLY.");
-                    GCSCacheRWMode::ReadOnly
-                },
-                _ => {
-                    warn!("No SCCACHE_GCS_RW_MODE specified-- defaulting to READ_ONLY.");
-                    GCSCacheRWMode::ReadOnly
-                }
-            };
-            GCSCacheConfig { bucket, cred_path, rw_mode }
-        });
+    let gcs = env::var("SCCACHE_GCS_BUCKET").ok().map(|bucket| {
+        let cred_path = env::var_os("SCCACHE_GCS_KEY_PATH").map(|p| PathBuf::from(p));
+        let rw_mode = match env::var("SCCACHE_GCS_RW_MODE").as_ref().map(String::as_str) {
+            Ok("READ_ONLY") => GCSCacheRWMode::ReadOnly,
+            Ok("READ_WRITE") => GCSCacheRWMode::ReadWrite,
+            // TODO: unsure if these should warn during the configuration loading
+            // or at the time when they're actually used to connect to GCS
+            Ok(_) => {
+                warn!("Invalid SCCACHE_GCS_RW_MODE-- defaulting to READ_ONLY.");
+                GCSCacheRWMode::ReadOnly
+            }
+            _ => {
+                warn!("No SCCACHE_GCS_RW_MODE specified-- defaulting to READ_ONLY.");
+                GCSCacheRWMode::ReadOnly
+            }
+        };
+        GCSCacheConfig {
+            bucket,
+            cred_path,
+            rw_mode,
+        }
+    });
 
-
-    let azure = env::var("SCCACHE_AZURE_CONNECTION_STRING").ok()
+    let azure = env::var("SCCACHE_AZURE_CONNECTION_STRING")
+        .ok()
         .map(|_| AzureCacheConfig);
 
     let disk = env::var_os("SCCACHE_DIR")
@@ -277,11 +294,10 @@ impl Config {
         let file_conf_path = env::var_os("SCCACHE_CONF")
             .map(|p| PathBuf::from(p))
             .unwrap_or_else(|| {
-                let dirs = ProjectDirs::from("", ORGANIZATION, APP_NAME);
+                let dirs = ProjectDirs::from("", ORGANIZATION, APP_NAME).unwrap();
                 dirs.config_dir().join("config")
             });
-        let file_conf = try_read_config_file(&file_conf_path)
-            .unwrap_or_default();
+        let file_conf = try_read_config_file(&file_conf_path).unwrap_or_default();
 
         Config::from_env_and_file_configs(env_conf, file_conf)
     }
@@ -296,7 +312,10 @@ impl Config {
         conf_caches.merge(cache);
 
         let (caches, fallback_cache) = conf_caches.into_vec_and_fallback();
-        Config { caches, fallback_cache }
+        Config {
+            caches,
+            fallback_cache,
+        }
     }
 }
 
@@ -346,8 +365,12 @@ fn config_overrides() {
         Config::from_env_and_file_configs(env_conf, file_conf),
         Config {
             caches: vec![
-                CacheType::Redis(RedisCacheConfig { url: "myotherredisurl".to_owned() }),
-                CacheType::Memcached(MemcachedCacheConfig { url: "memurl".to_owned() }),
+                CacheType::Redis(RedisCacheConfig {
+                    url: "myotherredisurl".to_owned(),
+                }),
+                CacheType::Memcached(MemcachedCacheConfig {
+                    url: "memurl".to_owned(),
+                }),
                 CacheType::Azure(AzureCacheConfig),
             ],
             fallback_cache: DiskCacheConfig {

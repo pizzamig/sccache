@@ -63,7 +63,7 @@ which = "1.0"
 zip = { version = "=0.2.3", default-features = false }
 lazy_static = "1.0.0"
 atty = "0.2.6"
-directories = "0.8.4"
+directories = "1.0.1"
 
 [dev-dependencies]
 assert_cmd = "0.6.0"

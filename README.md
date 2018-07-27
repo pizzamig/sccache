@@ -83,6 +83,10 @@ Build with `cargo` and use `dumpbin /dependents` to check that the resulting bin
 
 In order to statically link against both the CRT and OpenSSL, you will need to build OpenSSL with a statically linked CRT, which is left as an exercise for the reader. Generally it is simpler to just ship the OpenSSL DLLs.
 
+#### FreeBSD
+
+Initial support to FreeBSD is added.
+
 ---
 
 ## Installation
